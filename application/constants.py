@@ -12,6 +12,7 @@ ODSCODES = [
     "FVV02",
     "FDW12",
     "FTX40",
+    "FE712"
 ]
 LOW_RATING_THRESHOLD = 3
 SEARCHABLE_WORDS = [

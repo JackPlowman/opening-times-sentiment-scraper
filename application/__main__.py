@@ -1,14 +1,20 @@
 from requests import get
 from bs4 import BeautifulSoup
 from constants import ODSCODES, LOW_RATING_THRESHOLD, SEARCHABLE_WORDS
+from application_types import Review, Pharmacy
 
 def application() -> None:
+    bad_pharmacies = []
     for odscode in ODSCODES:
         print(f"Scraping {odscode}...")
-        scrape_reviews(odscode)
+        if reviews := scrape_reviews(odscode):
+            pharmacy_reviews = Pharmacy(name=odscode, reviews=reviews)
+            print(pharmacy_reviews)
+            bad_pharmacies.append(pharmacy_reviews)
+    print(bad_pharmacies)
 
 
-def scrape_reviews(odscode: str) -> None:
+def scrape_reviews(odscode: str) -> list[Review]:
     """Scrape reviews from the web
 
     Args:
@@ -29,25 +35,23 @@ def scrape_reviews(odscode: str) -> None:
         print("No reviews found")
         return
     soup = BeautifulSoup(content, "html.parser")
-    reviews = soup.findAll("div", {"class": "org-review"})
+    pharmacy_reviews = soup.findAll("div", {"class": "org-review"})
 
-    for review in reviews:
-        new_review = review.div
+    for pharmacy_review in pharmacy_reviews:
+        selected_review = pharmacy_review.div
         stars = [
-            new_review.find("p", {"id": f"star-rating-{number}"})
+            selected_review.find("p", {"id": f"star-rating-{number}"})
             for number in range(100)
-            if new_review.find("p", {"id": f"star-rating-{number}"}) is not None
+            if selected_review.find("p", {"id": f"star-rating-{number}"}) is not None
         ]
         star_rating = int(stars[0].text[6])
-        comments = new_review.find("p", {"class": "comment-text"}).text
+        comments = selected_review.find("p", {"class": "comment-text"}).text
         bad_reviews = []
-        # print(f"Analyzing star rating...: {star_rating <= LOW_RATING_THRESHOLD}")
-        # print(f"Analyzing any bad reviews...: {any(word in comments for word in SEARCHABLE_WORDS)}")
         if star_rating <= LOW_RATING_THRESHOLD or any(
             word in comments for word in SEARCHABLE_WORDS
         ):
-            bad_reviews.append({"stars":star_rating, "review_text":comments})
-        print(bad_reviews)
+            bad_reviews.append(Review(stars=star_rating, review_text=comments))
+        return bad_reviews
 
 
 if __name__ == "__main__":
