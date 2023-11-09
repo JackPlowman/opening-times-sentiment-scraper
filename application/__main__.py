@@ -1,9 +1,11 @@
 from requests import get
 from bs4 import BeautifulSoup
 from constants import ODSCODES, LOW_RATING_THRESHOLD, SEARCHABLE_WORDS
-from application_types import Review, Pharmacy
+from application_types import Review
 from openai import OpenAI
 from json import loads
+from pandas import DataFrame
+from os import remove, path
 
 open_ai_client = OpenAI()
 
@@ -13,12 +15,11 @@ def application() -> None:
     for odscode in ODSCODES:
         print(f"Scraping {odscode}...")
         if reviews := scrape_reviews(odscode):
-            pharmacies_with_reviews = Pharmacy(name=odscode, reviews=reviews)
-            negative_pharmacies_reviews.append(pharmacies_with_reviews)
-    print(negative_pharmacies_reviews)
+            negative_pharmacies_reviews = negative_pharmacies_reviews + reviews
     print(
         f"Found Total of {len(negative_pharmacies_reviews)} Pharmacies with negative reviews"
     )
+    generate_report(negative_pharmacies_reviews)
 
 
 def scrape_reviews(odscode: str) -> list[Review]:
@@ -63,27 +64,29 @@ def scrape_reviews(odscode: str) -> list[Review]:
             selected_review.find("span", {"role": "text"}).text.split("\r\n")[1].strip()
         )
 
-        if star_rating <= LOW_RATING_THRESHOLD or any(
+        if star_rating <= LOW_RATING_THRESHOLD and any(
             word in comments for word in SEARCHABLE_WORDS
         ):
-            ai_response = summarize_negative_sentiment(comments)
-            review_summary = ai_response["Summary"]
-            percent = ai_response[
+            review_summary = summarize_negative_sentiment(comments)
+            if "Summary" not in review_summary:
+                continue
+            else:
+                summary = review_summary["Summary"]
+            percent = review_summary[
                 "Percentage Likelihood review is related to incorrect opening times"
             ]
 
             negative_pharmacies_reviews.append(
                 Review(
+                    name=odscode,
+                    title=title,
+                    posted_on=posted_on,
                     stars=star_rating,
                     review_text=comments,
-                    posted_on=posted_on,
-                    title=title,
-                    review_summary=review_summary,
+                    summary=summary,
                     percent=percent,
                 )
             )
-            print(negative_pharmacies_reviews)
-
 
     print(f"Found {len(negative_pharmacies_reviews)} bad reviews")
     return negative_pharmacies_reviews
@@ -111,8 +114,28 @@ def summarize_negative_sentiment(review_message: str) -> dict:
         ],
         model="gpt-3.5-turbo",
     )
-    print(chat_completion)
-    return loads(chat_completion.choices[0].message.content)
+    try:
+        return loads(chat_completion.choices[0].message.content)
+    except Exception:
+        return {
+            "Summary": "No summary found",
+            "Percentage Likelihood review is related to incorrect opening times": "0%",
+        }
+
+
+def generate_report(pharmacies_reviews: list[Review]) -> None:
+    """Generate report
+
+    Args:
+        pharmacies_list (list[Review]): List of pharmacies reviews
+    """
+    filename = "application/negative_pharmacies_reviews.html"
+    pharmacies_reviews = DataFrame(pharmacies_reviews)
+    pharmacies_reviews.sort_values(by="percent")
+    if path.exists(filename):
+        remove(filename)
+    pharmacies_reviews.to_html(filename)
+    print(pharmacies_reviews)
 
 
 if __name__ == "__main__":
