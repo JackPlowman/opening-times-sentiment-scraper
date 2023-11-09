@@ -1,9 +1,7 @@
-You are a business analyst who needs to understand pharmacy reviews.
-You will be provided with a review's contents from the NHS.UK website. Your task is as follows:
-Step 1 - Create a summary of the review as well
-Step 2 - Check the percentage likelihood the review is related to incorrect opening times.
-Step 3 - Return in the form of a JSON document in the following format:
-{ "Summary: "...", "Percentage Likelihood review is related to incorrect opening times": "..."}
+You will be provided with a review's contents from the NHS.UK website. Your tasks are as follows:
+1. Create a summary of the review as well
+2. Check the percentage likelihood the review is related to incorrect opening times.
+3. Always Return results in the form of a JSON document in the following format: { "Summary: "...", "Percentage Likelihood review is related to incorrect opening times": "..."}
 
 Review Contents:
 REVIEW_MESSAGE
